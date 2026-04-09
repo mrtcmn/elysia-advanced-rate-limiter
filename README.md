@@ -170,7 +170,7 @@ import {
   composeResolvers,
 } from "elysia-advanced-rate-limiter";
 
-// IP-based (default). Checks x-forwarded-for, cf-connecting-ip, x-real-ip.
+// IP-based (default)
 rateLimiter({ keyResolver: ipResolver() });
 
 // User-based. Extracts user ID from JWT or session cookie.
@@ -182,6 +182,52 @@ rateLimiter({
   keyResolver: composeResolvers(userResolver(), ipResolver()),
 });
 ```
+
+### IP Resolution
+
+The IP resolver checks headers in this order:
+
+| Priority | Header | Set by | Spoofable? |
+|---|---|---|---|
+| 1 | `cf-connecting-ip` | Cloudflare | No |
+| 2 | `x-real-ip` | nginx / load balancer | No |
+| 3 | `x-forwarded-for` | Any proxy (or client) | Yes |
+| 4 | `"anonymous"` | Fallback | N/A |
+
+Trusted headers (`cf-connecting-ip`, `x-real-ip`) are checked first because they are set by your infrastructure and cannot be forged by clients. `x-forwarded-for` is checked last because anyone can send it.
+
+**If you're behind Cloudflare**, it just works. No config needed -- `cf-connecting-ip` is always the real client IP.
+
+**If you're behind nginx or a load balancer** that sets `x-real-ip`, it also just works.
+
+**If you only have `x-forwarded-for`** (e.g. a plain reverse proxy), use `trustedProxyDepth` to prevent spoofing:
+
+```typescript
+// Behind 1 proxy (e.g. nginx that only sets x-forwarded-for)
+rateLimiter({ keyResolver: ipResolver({ trustedProxyDepth: 1 }) });
+
+// Behind 2 proxies (e.g. CDN → load balancer)
+rateLimiter({ keyResolver: ipResolver({ trustedProxyDepth: 2 }) });
+```
+
+Without `trustedProxyDepth`, the resolver takes the leftmost IP in `x-forwarded-for`, which a client can fake:
+
+```
+Client sends:      x-forwarded-for: fake-ip
+Your proxy adds:   x-forwarded-for: fake-ip, real-ip
+                                    ^^^^^^
+                                    leftmost = attacker controls the rate limit key
+```
+
+With `trustedProxyDepth: 1`, it takes the rightmost IP (the one your proxy added), which the client cannot control:
+
+```
+x-forwarded-for: fake-ip, real-ip
+                           ^^^^^^^
+                           rightmost = your proxy added this, safe
+```
+
+Set `trustedProxyDepth` to the number of proxies between the internet and your app.
 
 ## Multiple Rate Limits
 
