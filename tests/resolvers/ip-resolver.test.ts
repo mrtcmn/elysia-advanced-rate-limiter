@@ -45,7 +45,7 @@ describe("ipResolver", () => {
   });
 
   describe("priority order", () => {
-    it("prefers x-forwarded-for over cf-connecting-ip", () => {
+    it("prefers cf-connecting-ip over x-forwarded-for", () => {
       const key = resolve(
         req({
           "x-forwarded-for": "1.1.1.1",
@@ -53,7 +53,7 @@ describe("ipResolver", () => {
           "x-real-ip": "3.3.3.3",
         })
       );
-      expect(key).toBe("1.1.1.1");
+      expect(key).toBe("2.2.2.2");
     });
 
     it("prefers cf-connecting-ip over x-real-ip", () => {
@@ -64,6 +64,16 @@ describe("ipResolver", () => {
         })
       );
       expect(key).toBe("2.2.2.2");
+    });
+
+    it("prefers x-real-ip over x-forwarded-for", () => {
+      const key = resolve(
+        req({
+          "x-forwarded-for": "1.1.1.1",
+          "x-real-ip": "3.3.3.3",
+        })
+      );
+      expect(key).toBe("3.3.3.3");
     });
   });
 
