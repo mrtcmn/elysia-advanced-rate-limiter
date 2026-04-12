@@ -1,3 +1,0 @@
-export const THROTTLER_OPTIONS = "THROTTLER_OPTIONS";
-export const THROTTLER_ALGORITHM = "THROTTLER:algorithm";
-export const THROTTLER_SKIP = "THROTTLER:skip";

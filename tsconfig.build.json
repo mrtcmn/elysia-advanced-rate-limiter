@@ -4,8 +4,7 @@
     "index.ts",
     "core/**/*.ts",
     "plugin/**/*.ts",
-    "resolvers/**/*.ts",
-    "nestjs/**/*.ts"
+    "resolvers/**/*.ts"
   ],
   "exclude": [
     "node_modules",
