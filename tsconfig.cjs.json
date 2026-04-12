@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "dist/cjs",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": [
+    "index.ts",
+    "core/**/*.ts",
+    "plugin/**/*.ts",
+    "resolvers/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "tests", "benchmark"]
+}

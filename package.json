@@ -1,6 +1,6 @@
 {
   "name": "elysia-advanced-rate-limiter",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "A fast, opinionated rate limiter for Elysia. Fixed window, sliding window, and token bucket (GCRA). In-memory or Redis.",
   "author": "mrtcmn",
@@ -25,12 +25,15 @@
     "bun",
     "middleware"
   ],
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/cjs/index.js"
     }
   },
   "files": [
@@ -41,7 +44,7 @@
   "scripts": {
     "build": "bun run build:clean && bun run build:tsc",
     "build:clean": "rm -rf dist",
-    "build:tsc": "tsc --project tsconfig.build.json",
+    "build:tsc": "tsc --project tsconfig.esm.json && tsc --project tsconfig.cjs.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "typecheck": "tsc --noEmit",
