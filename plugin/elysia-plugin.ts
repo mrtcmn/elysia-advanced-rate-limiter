@@ -78,7 +78,11 @@ export function rateLimiter(options: RateLimiterOptions = {}): any {
   const resultMap = new WeakMap<Request, RateLimitResult>();
 
   return new Elysia({ name: `rate-limiter-${prefix}` })
-    .onRequest(async ({ request, set }) => {
+    // onBeforeHandle (scoped) runs AFTER routing, so Elysia's plugin scope is
+    // respected — a limiter attached to a sub-app only rate limits its own
+    // routes, not sibling/parent routes. onRequest runs before routing and
+    // would leak across the whole app.
+    .onBeforeHandle({ as: "scoped" }, async ({ request, set }) => {
       if (skip?.(request)) {
         return undefined;
       }
@@ -121,7 +125,7 @@ export function rateLimiter(options: RateLimiterOptions = {}): any {
 
       return undefined;
     })
-    .onAfterHandle({ as: "global" }, ({ request, set }) => {
+    .onAfterHandle({ as: "scoped" }, ({ request, set }) => {
       const result = resultMap.get(request);
       if (!result) {
         return;

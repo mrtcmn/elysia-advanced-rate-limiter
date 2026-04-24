@@ -839,4 +839,99 @@ describe("rateLimiter Elysia plugin", () => {
       expect(res2.status).toBe(503);
     });
   });
+
+  describe("plugin scope is respected when limiter lives in a sub-app", () => {
+    it("limiter mounted in a scoped sub-app does not rate limit outer routes", async () => {
+      // /admin/* has a strict limiter (capacity=1). /public should be untouched.
+      const adminRoutes = new Elysia({ prefix: "/admin" })
+        .use(
+          rateLimiter({
+            algorithm: { algorithm: "token-bucket", capacity: 1, refillRate: 1 },
+            prefix: "admin:",
+          })
+        )
+        .get("/users", () => ({ users: [] }));
+
+      const app = new Elysia()
+        .get("/public", () => ({ public: true }))
+        .use(adminRoutes);
+
+      const ip = "scope-leak.1.1.1";
+
+      // Burn the single admin token.
+      const admin1 = await app.handle(
+        request("/admin/users", { "x-forwarded-for": ip })
+      );
+      expect(admin1.status).toBe(200);
+
+      // /public is outside the scope where the admin limiter was attached, so
+      // it must NOT be rate limited by the admin limiter.
+      const pub1 = await app.handle(
+        request("/public", { "x-forwarded-for": ip })
+      );
+      expect(pub1.status).toBe(200);
+
+      const pub2 = await app.handle(
+        request("/public", { "x-forwarded-for": ip })
+      );
+      expect(pub2.status).toBe(200);
+
+      // Admin route is still rate limited for the same IP.
+      const admin2 = await app.handle(
+        request("/admin/users", { "x-forwarded-for": ip })
+      );
+      expect(admin2.status).toBe(429);
+    });
+
+    it("two limiters scoped to different sub-apps stay isolated by route", async () => {
+      // Two independent sub-apps, each with its own limiter.
+      const apiRoutes = new Elysia({ prefix: "/api" })
+        .use(
+          rateLimiter({
+            algorithm: { algorithm: "token-bucket", capacity: 1, refillRate: 1 },
+            prefix: "api-scope:",
+          })
+        )
+        .get("/data", () => ({ data: true }));
+
+      const webRoutes = new Elysia({ prefix: "/web" })
+        .use(
+          rateLimiter({
+            algorithm: { algorithm: "token-bucket", capacity: 1, refillRate: 1 },
+            prefix: "web-scope:",
+          })
+        )
+        .get("/page", () => ({ page: true }));
+
+      const app = new Elysia().use(apiRoutes).use(webRoutes);
+
+      const ip = "two-scope.1.1.1";
+
+      // Consume /api token. This should not affect /web.
+      const api1 = await app.handle(
+        request("/api/data", { "x-forwarded-for": ip })
+      );
+      expect(api1.status).toBe(200);
+
+      // /web has its own fresh bucket — first hit allowed.
+      const web1 = await app.handle(
+        request("/web/page", { "x-forwarded-for": ip })
+      );
+      expect(web1.status).toBe(200);
+
+      // /api second hit blocked by /api's limiter.
+      const api2 = await app.handle(
+        request("/api/data", { "x-forwarded-for": ip })
+      );
+      expect(api2.status).toBe(429);
+
+      // /web second hit blocked by /web's own limiter — NOT by /api's.
+      // With the onRequest bug, /web would have already been counted against
+      // /api's limiter on api1, so web1 above could fail first.
+      const web2 = await app.handle(
+        request("/web/page", { "x-forwarded-for": ip })
+      );
+      expect(web2.status).toBe(429);
+    });
+  });
 });
